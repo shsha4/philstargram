@@ -12,3 +12,10 @@ spring:
   sql:
     init:
       mode: always
+  modulith:
+    events:
+      jdbc:
+        # event_publication 테이블을 Modulith 가 시작 시 자체 스키마로 생성한다.
+        # (JDBC 레지스트리라 JPA 엔티티가 없어 ddl-auto=validate 와 충돌하지 않음)
+        schema-initialization:
+          enabled: true
