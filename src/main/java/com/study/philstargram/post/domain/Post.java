@@ -5,7 +5,8 @@ import java.util.Objects;
 
 public class Post {
 
-    private static final int MAX_CONTENT_LENGTH = 2000;
+    /** 게시글 본문 길이 제한의 단일 소스. 다른 계층(web DTO 등)에서 중복 정의하지 않는다. */
+    public static final int MAX_CONTENT_LENGTH = 2000;
 
     private final Long id;
     private final Long authorId;
