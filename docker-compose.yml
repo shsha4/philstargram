@@ -10,6 +10,37 @@ services:
       - "5432:5432"
     volumes:
       - philstargram-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U philstargram -d philstargram"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: philstargram-backend
+    environment:
+      # 컨테이너 네트워크에서는 localhost 가 아니라 postgres 서비스명으로 접속한다
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/philstargram
+      SPRING_DATASOURCE_USERNAME: philstargram
+      SPRING_DATASOURCE_PASSWORD: philstargram
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+    container_name: philstargram-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
 
 volumes:
   philstargram-postgres-data:
