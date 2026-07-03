@@ -4,7 +4,6 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.study.philstargram.follow.application.MemberFollowedEvent;
 import com.study.philstargram.member.application.MemberQueryService;
 import com.study.philstargram.member.application.MemberSummary;
 import com.study.philstargram.notification.domain.NotificationRepository;
@@ -16,7 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class NotifyFolloweeOnMemberFollowedTest {
+class NotifyNewFollowerUseCaseTest {
 
     @Mock
     MemberQueryService memberQueryService;
@@ -25,14 +24,15 @@ class NotifyFolloweeOnMemberFollowedTest {
     NotificationRepository notificationRepository;
 
     @InjectMocks
-    NotifyFolloweeOnMemberFollowed notifyFolloweeOnMemberFollowed;
+    NotifyNewFollowerUseCase notifyNewFollowerUseCase;
 
     @Test
     void notifiesTheFollowee() {
         when(memberQueryService.getSummary(2L)).thenReturn(new MemberSummary(2L, "bob"));
 
-        notifyFolloweeOnMemberFollowed.on(new MemberFollowedEvent(2L, 1L, LocalDateTime.now()));
+        notifyNewFollowerUseCase.execute(new NotifyNewFollowerCommand(2L, 1L, LocalDateTime.now()));
 
-        verify(notificationRepository).save(argThat(n -> n.getRecipientMemberId().equals(1L) && n.getMessage().contains("bob")));
+        verify(notificationRepository).save(argThat(n ->
+                n.getRecipientMemberId().equals(1L) && n.getMessage().contains("bob")));
     }
 }
