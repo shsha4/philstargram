@@ -38,7 +38,8 @@ class ArchitectureTest {
         ArchRule rule = noClasses()
                 .that().resideInAPackage(BASE_PACKAGE + "..domain..")
                 .should().dependOnClassesThat()
-                .resideInAnyPackage("org.springframework..", "jakarta.persistence..", "org.hibernate..", "com.fasterxml.jackson..")
+                .resideInAnyPackage("org.springframework..", "jakarta.persistence..", "org.hibernate..",
+                        "com.fasterxml.jackson..", "tools.jackson..")
                 .because("domain 은 JPA/Spring/Jackson 등 어떤 전달/영속 기술도 알아서는 안 된다");
         rule.check(CLASSES);
     }

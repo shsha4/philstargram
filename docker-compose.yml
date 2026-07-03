@@ -16,20 +16,53 @@ services:
       timeout: 3s
       retries: 10
 
+  kafka:
+    image: confluentinc/cp-kafka:7.8.0
+    container_name: philstargram-kafka
+    ports:
+      # 호스트의 localhost:9092 → 컨테이너 HOST 리스너(9094). 로컬 bootRun/디버깅용.
+      - "9092:9094"
+    environment:
+      # KRaft 단일 노드(Zookeeper 없음): 한 컨테이너가 broker + controller 를 겸한다.
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # INTERNAL(9092): 컨테이너 네트워크의 backend 가 kafka:9092 로 접속.
+      # HOST(9094→호스트 9092): 호스트에서 localhost:9092 로 접속.
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,HOST://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT,HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # KRaft 는 고정 cluster id 필요(유효한 base64 UUID, 볼륨 재기동 시 일관).
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   backend:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: philstargram-backend
     environment:
-      # 컨테이너 네트워크에서는 localhost 가 아니라 postgres 서비스명으로 접속한다
+      # 컨테이너 네트워크에서는 localhost 가 아니라 서비스명으로 접속한다
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/philstargram
       SPRING_DATASOURCE_USERNAME: philstargram
       SPRING_DATASOURCE_PASSWORD: philstargram
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     ports:
       - "8080:8080"
     depends_on:
       postgres:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
 
   frontend:

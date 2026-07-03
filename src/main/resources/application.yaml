@@ -12,6 +12,22 @@ spring:
   sql:
     init:
       mode: always
+  kafka:
+    # 로컬 기본값. 컨테이너에서는 SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 로 덮어쓴다.
+    bootstrap-servers: localhost:9092
+    producer:
+      # Modulith externalizer 는 이벤트를 이미 JSON byte[] 로 직렬화(spring-modulith-events-jackson)해서
+      # 넘긴다. 따라서 value 는 그 바이트를 "그대로 통과"시켜야 한다 → ByteArraySerializer.
+      # (JsonSerializer 를 쓰면 byte[] 를 다시 JSON 직렬화해 base64 문자열이 되어버린다.)
+      # 파티션 키는 SpEL 로 만든 String 이므로(@Externalized) key 는 StringSerializer.
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+    consumer:
+      # 컨슈머는 JSON 문자열로 받아 인바운드 어댑터가 명시적으로 역직렬화한다(계약을 코드로 드러냄).
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # 컨슈머가 토픽보다 먼저 떠도 처음부터 읽도록(개발/테스트 결정성).
+      auto-offset-reset: earliest
   modulith:
     events:
       jdbc:
@@ -19,3 +35,5 @@ spring:
         # (JDBC 레지스트리라 JPA 엔티티가 없어 ddl-auto=validate 와 충돌하지 않음)
         schema-initialization:
           enabled: true
+      # 재시작 시 브로커 발행이 끝나지 않은(미완료) 이벤트를 다시 발행한다(at-least-once 릴레이).
+      republish-outstanding-events-on-restart: true

@@ -6,8 +6,8 @@
 
 ## 기술 스택
 
-Java 21, Spring Boot 4.1, Spring Modulith, Spring Data JPA, PostgreSQL,
-Testcontainers, ArchUnit. Redis / Kafka / Elasticsearch / Outbox 는 아래 로드맵에
+Java 21, Spring Boot 4.1, Spring Modulith(+ 이벤트 외부화), Spring Data JPA, PostgreSQL,
+Kafka(Spring Kafka), Testcontainers, ArchUnit. Redis / Elasticsearch 는 아래 로드맵에
 따라 한꺼번에가 아니라 단계적으로 도입합니다.
 
 ## 모듈 구성과 분리 이유
@@ -53,7 +53,9 @@ com.study.philstargram
    `FollowMemberUseCase` 등)를 호출합니다.
 5. **모듈 간 순환 의존 금지.** `ArchitectureTest`(`modulesAreFreeOfCycles`)가
    강제합니다. 현재 의존 그래프는 다음과 같습니다:
-   `post`, `follow` → `member`; `feed`, `notification` → `member`, `follow`.
+   `post`, `follow` → `member`; `feed`, `notification` → `follow`.
+   (phase 4 의 event-carried state 로 `feed`/`notification` 의 `member` 의존이 사라졌습니다 —
+   필요한 작성자/팔로워 닉네임을 이벤트가 실어오기 때문입니다.)
 
 모듈별 헥사고날 흐름: `adapter.in.web → application → domain`,
 `adapter.out.persistence → application/domain`, 그리고 `domain` 은 바깥을 향하지
@@ -68,14 +70,15 @@ com.study.philstargram
 쓰기보다 훨씬 잦으므로, 게시글 작성 시점에 팔로워들의 피드에 미리 적재하여 읽기
 성능을 우선합니다.
 
-동작 방식: `CreatePostUseCase` 가 `PostCreatedEvent` 를 발행하면, `feed` 모듈의
-`FeedFanOutOnPostCreated`(`@ApplicationModuleListener`)가 이를 받아 작성자를
-팔로우하는 모든 사용자의 피드에 `FeedEntry` 를 저장합니다. 이때 작성자 닉네임과 본문
-미리보기를 비정규화하여 함께 저장하므로, 피드 조회(`GetMyFeedUseCase`)는 feed 자신의
-테이블만 읽고 다른 모듈을 호출하지 않습니다.
+동작 방식: `CreatePostUseCase` 가 `PostCreatedEvent` 를 발행하면(phase 4 부터 Kafka
+`post.created` 토픽으로 외부화), `feed` 모듈의 `@KafkaListener` 인입 어댑터가 이를 받아
+`FanOutFeedUseCase` 에 위임하고, 작성자를 팔로우하는 모든 사용자의 피드에 `FeedEntry` 를
+저장합니다. 이때 작성자 닉네임(이벤트가 실어온 값)과 본문 미리보기를 비정규화하여 함께
+저장하므로, 피드 조회(`GetMyFeedUseCase`)는 feed 자신의 테이블만 읽고 다른 모듈을 호출하지
+않습니다.
 
-리스너는 발행 트랜잭션이 커밋된 뒤 별도 트랜잭션에서 비동기로 실행되므로, 팬아웃이
-느리거나 실패해도 게시글 생성 자체를 막거나 롤백시키지 않습니다. 팔로워가 매우 많은
+컨슈머는 발행 트랜잭션과 무관한 별도 프로세스/트랜잭션에서 실행되므로, 팬아웃이 느리거나
+실패해도 게시글 생성 자체를 막거나 롤백시키지 않습니다(at-least-once). 팔로워가 매우 많은
 계정에서 팬아웃 비용이 커지는 문제는 추후 하이브리드/읽기 시점 팬아웃 전략(로드맵
 phase 5)으로 보완할 수 있도록 설계했습니다.
 
@@ -84,9 +87,9 @@ phase 5)으로 보완할 수 있도록 설계했습니다.
 `post` 는 `PostCreatedEvent` 만 발행하고 그 뒤에 무슨 일이 일어나는지는 신경 쓰지
 않습니다. `feed`, `notification`, (추후) `search` 가 각각 독립적으로 어떻게 반응할지
 결정합니다(피드 팬아웃, 알림 생성, 검색 색인). 덕분에 `post` 는 다른 여러 모듈의
-관심사를 알 필요가 없고, 나중에 이 반응자(reactor)들 중 하나를 별도 서비스로 분리할
-때도 인메모리 리스너를 Kafka 컨슈머로 바꾸는 정도로 끝나지, 재작성이 필요하지
-않습니다.
+관심사를 알 필요가 없습니다. phase 4 에서 이 이벤트를 Kafka 로 외부화하고 반응자들을
+`@KafkaListener` 컨슈머로 전환했으므로, 이제 반응자 하나를 별도 서비스로 분리하는 일은
+"같은 토픽을 구독하는 별도 앱으로 옮기는" 배포 문제에 가깝지, 재작성이 아닙니다.
 
 ## MSA 분리 후보
 
@@ -98,12 +101,16 @@ phase 5)으로 보완할 수 있도록 설계했습니다.
 ## 로컬 실행
 
 ```bash
-docker compose up -d          # localhost:5432 에 PostgreSQL 기동
-./gradlew bootRun             # 앱 기동; 시작 시 schema.sql 실행
+# 전체 스택(운영 형태): postgres + kafka + backend + frontend
+docker compose up -d --build   # frontend :3000, backend :8080, db :5432, kafka :9092
+
+# 개발(핫리로드): 인프라만 컨테이너로, 앱은 로컬 실행
+docker compose up -d postgres kafka  # PostgreSQL + Kafka(KRaft 단일 브로커)
+./gradlew bootRun                    # 앱 기동; 시작 시 schema.sql 실행
 ```
 
-테스트는 `docker compose up` 이 필요 없습니다. DB 를 건드리는 테스트는 각자
-Testcontainers PostgreSQL 을 띄웁니다.
+테스트는 `docker compose up` 이 필요 없습니다. 통합 테스트는 각자 Testcontainers 로
+PostgreSQL 과 Kafka 를 띄웁니다(Docker 데몬은 실행 중이어야 함).
 
 ```bash
 ./gradlew test
@@ -146,8 +153,6 @@ Testcontainers PostgreSQL 을 띄웁니다.
 2. **Spring Modulith 이벤트** — `PostCreatedEvent`/`MemberFollowedEvent` 발행,
    `feed`(쓰기 시점 팬아웃) 및 `notification` 리스너. ✅ 완료
 
-**계획된 단계 (인프라 + 도메인 인터리빙)**
-
 3. **신뢰성 + 도메인 리치화** — Outbox 로 이벤트 발행을 안정화하면서, 동시에 도메인
    모델을 강화한다. ✅ 완료
    - Outbox: Spring Modulith 이벤트 발행 레지스트리(JDBC 기반)로 발행 신뢰성 +
@@ -164,11 +169,19 @@ Testcontainers PostgreSQL 을 띄웁니다.
    - 인입 어댑터 일관성: 이벤트 리스너를 `adapter.in.event` 로 분리하고 실제 작업은
      `FanOutFeedUseCase` 등 UseCase 로 옮겨, web 어댑터와 동일한 헥사고날 구조로 정리.
    - 중복 규칙 제거: 게시글 길이 제한 등은 도메인 한 곳에서만 정의.
-4. **Kafka + 결합 제거** — 내부 이벤트를 외부 메시지로 확장하고, feed/notification/
-   search 를 독립 배포 가능한 컨슈머로 분리한다.
-   - event-carried state: 이벤트 페이로드에 필요한 데이터(예: 작성자 nickname)를 실어,
-     feed/notification 의 `MemberQueryService` 동기 의존을 제거.
-   - 이벤트 스키마를 명시적 공개 계약으로 승격(버전/직렬화/호환성 관리).
+4. **Kafka + 결합 제거** — 내부 이벤트를 외부 메시지로 확장하고, feed/notification 을
+   독립 배포 가능한 Kafka 컨슈머로 전환한다. ✅ 완료
+   - 이벤트 외부화: `@Externalized` 로 `post.created`/`member.followed` 토픽에 발행(기존 JDBC
+     Outbox 레지스트리가 릴레이). feed/notification 은 `@KafkaListener`(독립 컨슈머 그룹)로 수신.
+   - event-carried state: 이벤트 페이로드에 작성자/팔로워 nickname 을 실어 feed/notification 의
+     `MemberQueryService` 동기 의존을 제거 → **feed·notification 이 더 이상 member 에 의존하지 않음**.
+   - 이벤트 스키마를 공개 계약으로: 토픽명 + JSON 형태가 계약(생산자 타입 헤더 미의존), 토픽은
+     생산 모듈이 `NewTopic` 으로 선언. at-least-once 전달(컨슈머 idempotency 는 phase 5).
+   - Kafka Streams 는 미도입: "이벤트→DB 사이드이펙트"엔 일반 컨슈머가 맞다. 집계/조인 명분이 생기는
+     phase 5 하이브리드 팬아웃에서 검토.
+
+**계획된 단계 (인프라 + 도메인 인터리빙)**
+
 5. **Redis + 일관성 전략** — 피드 캐시 도입. 단, **이중 쓰기(dual-write) 일관성 전략
    (write-through / 캐시 무효화)을 먼저 설계**한 뒤 진행. 팔로워가 많은 계정용
    하이브리드/읽기 시점 팬아웃 전략 실험.

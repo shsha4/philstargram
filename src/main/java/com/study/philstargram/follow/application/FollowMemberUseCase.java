@@ -24,9 +24,9 @@ public class FollowMemberUseCase {
 
     @Transactional
     public void execute(FollowMemberCommand command) {
-        if (!memberQueryService.existsById(command.followerId())) {
-            throw new NotFoundException("존재하지 않는 회원입니다: " + command.followerId());
-        }
+        // 팔로워 존재 검증과 닉네임 조회를 한 번에(없으면 NotFoundException). event-carried state:
+        // 이 닉네임을 이벤트에 실어 notification 이 member 를 재조회하지 않고 알림 문구를 만든다.
+        String followerNickname = memberQueryService.getSummary(command.followerId()).nickname();
         if (!memberQueryService.existsById(command.followeeId())) {
             throw new NotFoundException("존재하지 않는 회원입니다: " + command.followeeId());
         }
@@ -36,6 +36,6 @@ public class FollowMemberUseCase {
         Follow follow = followRepository.save(Follow.create(command.followerId(), command.followeeId()));
         // 애그리거트가 발생시킨 도메인 이벤트를 드레인해 모듈 간 계약으로 번역·발행한다.
         follow.pullDomainEvents().forEach(event ->
-                eventPublisher.publishEvent(new MemberFollowedEvent(event.followerId(), event.followeeId(), event.followedAt())));
+                eventPublisher.publishEvent(new MemberFollowedEvent(event.followerId(), event.followeeId(), followerNickname, event.followedAt())));
     }
 }

@@ -1,13 +1,12 @@
 package com.study.philstargram.notification.application;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.study.philstargram.follow.application.FollowQueryService;
-import com.study.philstargram.member.application.MemberQueryService;
-import com.study.philstargram.member.application.MemberSummary;
 import com.study.philstargram.notification.domain.Notification;
 import com.study.philstargram.notification.domain.NotificationRepository;
 import java.time.LocalDateTime;
@@ -25,9 +24,6 @@ class NotifyNewPostUseCaseTest {
     FollowQueryService followQueryService;
 
     @Mock
-    MemberQueryService memberQueryService;
-
-    @Mock
     NotificationRepository notificationRepository;
 
     @InjectMocks
@@ -35,11 +31,13 @@ class NotifyNewPostUseCaseTest {
 
     @Test
     void notifiesEveryFollowerOfTheAuthor() {
-        when(memberQueryService.getSummary(1L)).thenReturn(new MemberSummary(1L, "alice"));
         when(followQueryService.getFollowerIds(1L)).thenReturn(List.of(2L, 3L));
 
-        notifyNewPostUseCase.execute(new NotifyNewPostCommand(1L, LocalDateTime.now()));
+        // 작성자 닉네임("alice")은 이벤트가 실어온 값 — member 조회 없이 알림 문구를 만든다.
+        notifyNewPostUseCase.execute(new NotifyNewPostCommand(1L, "alice", LocalDateTime.now()));
 
         verify(notificationRepository, times(2)).save(any(Notification.class));
+        verify(notificationRepository).save(argThat(n ->
+                n.getRecipientMemberId().equals(2L) && n.getMessage().contains("alice")));
     }
 }

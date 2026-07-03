@@ -35,6 +35,10 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.modulith:spring-modulith-starter-jdbc'
     implementation 'org.springframework.modulith:spring-modulith-events-api'
+    // Kafka 연동: 이벤트 발행(producer)과 컨슈머(@KafkaListener). spring-kafka 버전은 Boot 4.1 이 관리.
+    implementation 'org.springframework.kafka:spring-kafka'
+    // 이벤트 발행 레지스트리(Outbox)를 Kafka 토픽으로 릴레이하는 externalizer 자동설정.
+    implementation 'org.springframework.modulith:spring-modulith-events-kafka'
 
     runtimeOnly 'org.postgresql:postgresql'
 
@@ -44,6 +48,8 @@ dependencies {
     testImplementation 'org.springframework.modulith:spring-modulith-starter-test'
     testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
     testImplementation 'org.testcontainers:testcontainers-postgresql'
+    testImplementation 'org.testcontainers:testcontainers-kafka'
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.4.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
