@@ -34,6 +34,8 @@ public class FollowMemberUseCase {
             throw new DuplicateException("이미 팔로우 중입니다.");
         }
         Follow follow = followRepository.save(Follow.create(command.followerId(), command.followeeId()));
-        eventPublisher.publishEvent(new MemberFollowedEvent(follow.getFollowerId(), follow.getFolloweeId(), follow.getFollowedAt()));
+        // 애그리거트가 발생시킨 도메인 이벤트를 드레인해 모듈 간 계약으로 번역·발행한다.
+        follow.pullDomainEvents().forEach(event ->
+                eventPublisher.publishEvent(new MemberFollowedEvent(event.followerId(), event.followeeId(), event.followedAt())));
     }
 }

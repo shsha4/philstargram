@@ -6,9 +6,9 @@ public interface MemberRepository {
 
     Member save(Member member);
 
-    Optional<Member> findById(Long id);
+    Optional<Member> findById(MemberId id);
 
-    boolean existsById(Long id);
+    boolean existsById(MemberId id);
 
     boolean existsByEmail(String email);
 }

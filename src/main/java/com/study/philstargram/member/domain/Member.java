@@ -1,17 +1,16 @@
 package com.study.philstargram.member.domain;
 
 import java.time.LocalDateTime;
-import java.util.Objects;
 
 public class Member {
 
-    private final Long id;
-    private final String email;
-    private final String nickname;
+    private final MemberId id;
+    private final Email email;
+    private final Nickname nickname;
     private final String bio;
     private final LocalDateTime createdAt;
 
-    private Member(Long id, String email, String nickname, String bio, LocalDateTime createdAt) {
+    private Member(MemberId id, Email email, Nickname nickname, String bio, LocalDateTime createdAt) {
         this.id = id;
         this.email = email;
         this.nickname = nickname;
@@ -20,28 +19,26 @@ public class Member {
     }
 
     public static Member signUp(String email, String nickname, String bio) {
-        Objects.requireNonNull(email, "email must not be null");
-        Objects.requireNonNull(nickname, "nickname must not be null");
-        return new Member(null, email, nickname, bio, LocalDateTime.now());
+        return new Member(null, Email.of(email), Nickname.of(nickname), bio, LocalDateTime.now());
     }
 
     public static Member reconstitute(Long id, String email, String nickname, String bio, LocalDateTime createdAt) {
-        return new Member(id, email, nickname, bio, createdAt);
+        return new Member(MemberId.of(id), Email.of(email), Nickname.of(nickname), bio, createdAt);
     }
 
     public Member withId(Long id) {
-        return new Member(id, this.email, this.nickname, this.bio, this.createdAt);
+        return new Member(MemberId.of(id), this.email, this.nickname, this.bio, this.createdAt);
     }
 
-    public Long getId() {
+    public MemberId getId() {
         return id;
     }
 
-    public String getEmail() {
+    public Email getEmail() {
         return email;
     }
 
-    public String getNickname() {
+    public Nickname getNickname() {
         return nickname;
     }
 

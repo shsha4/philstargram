@@ -1,6 +1,7 @@
 package com.study.philstargram.member.adapter.out.persistence;
 
 import com.study.philstargram.member.domain.Member;
+import com.study.philstargram.member.domain.MemberId;
 import com.study.philstargram.member.domain.MemberRepository;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
@@ -21,13 +22,13 @@ class MemberPersistenceAdapter implements MemberRepository {
     }
 
     @Override
-    public Optional<Member> findById(Long id) {
-        return memberJpaRepository.findById(id).map(MemberPersistenceAdapter::toDomain);
+    public Optional<Member> findById(MemberId id) {
+        return memberJpaRepository.findById(id.value()).map(MemberPersistenceAdapter::toDomain);
     }
 
     @Override
-    public boolean existsById(Long id) {
-        return memberJpaRepository.existsById(id);
+    public boolean existsById(MemberId id) {
+        return memberJpaRepository.existsById(id.value());
     }
 
     @Override
@@ -36,7 +37,8 @@ class MemberPersistenceAdapter implements MemberRepository {
     }
 
     private static MemberJpaEntity toEntity(Member member) {
-        return new MemberJpaEntity(member.getId(), member.getEmail(), member.getNickname(), member.getBio(), member.getCreatedAt());
+        Long id = member.getId() == null ? null : member.getId().value();
+        return new MemberJpaEntity(id, member.getEmail().value(), member.getNickname().value(), member.getBio(), member.getCreatedAt());
     }
 
     private static Member toDomain(MemberJpaEntity entity) {

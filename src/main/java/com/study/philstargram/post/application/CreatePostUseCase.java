@@ -26,9 +26,9 @@ public class CreatePostUseCase {
         if (!memberQueryService.existsById(command.authorId())) {
             throw new NotFoundException("존재하지 않는 회원입니다: " + command.authorId());
         }
-        Post post = Post.write(command.authorId(), command.content());
-        PostResult result = PostResult.from(postRepository.save(post));
-        eventPublisher.publishEvent(PostCreatedEvent.from(result));
-        return result;
+        Post post = postRepository.save(Post.write(command.authorId(), command.content()));
+        // 애그리거트가 발생시킨 도메인 이벤트를 드레인해 모듈 간 계약으로 번역·발행한다.
+        post.pullDomainEvents().forEach(event -> eventPublisher.publishEvent(PostCreatedEvent.from(event)));
+        return PostResult.from(post);
     }
 }

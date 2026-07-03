@@ -1,6 +1,7 @@
 package com.study.philstargram.member.application;
 
 import com.study.philstargram.common.exception.NotFoundException;
+import com.study.philstargram.member.domain.MemberId;
 import com.study.philstargram.member.domain.MemberRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,7 +17,7 @@ public class GetMemberUseCase {
 
     @Transactional(readOnly = true)
     public MemberResult execute(Long memberId) {
-        return memberRepository.findById(memberId)
+        return memberRepository.findById(MemberId.of(memberId))
                 .map(MemberResult::from)
                 .orElseThrow(() -> new NotFoundException("존재하지 않는 회원입니다: " + memberId));
     }

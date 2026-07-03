@@ -35,4 +35,43 @@ class PostTest {
 
         assertThat(Post.write(1L, atLimit).getContent()).hasSize(Post.MAX_CONTENT_LENGTH);
     }
+
+    @Test
+    void raisesPostWrittenEventAfterIdIsAssigned() {
+        Post post = Post.write(1L, "hello");
+        post.assignId(PostId.of(10L));
+
+        assertThat(post.pullDomainEvents())
+                .singleElement()
+                .satisfies(event -> {
+                    assertThat(event.postId()).isEqualTo(PostId.of(10L));
+                    assertThat(event.authorId()).isEqualTo(1L);
+                    assertThat(event.content()).isEqualTo("hello");
+                });
+    }
+
+    @Test
+    void drainsDomainEventsOnlyOnce() {
+        Post post = Post.write(1L, "hello");
+        post.assignId(PostId.of(10L));
+
+        assertThat(post.pullDomainEvents()).hasSize(1);
+        assertThat(post.pullDomainEvents()).isEmpty();
+    }
+
+    @Test
+    void reconstitutedPostRaisesNoEvents() {
+        Post post = Post.reconstitute(10L, 1L, "hello", java.time.LocalDateTime.now());
+
+        assertThat(post.pullDomainEvents()).isEmpty();
+    }
+
+    @Test
+    void rejectsAssigningIdTwice() {
+        Post post = Post.write(1L, "hello");
+        post.assignId(PostId.of(10L));
+
+        assertThatThrownBy(() -> post.assignId(PostId.of(11L)))
+                .isInstanceOf(IllegalStateException.class);
+    }
 }

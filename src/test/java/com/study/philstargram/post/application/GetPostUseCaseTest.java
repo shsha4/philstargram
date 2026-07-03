@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.study.philstargram.common.exception.NotFoundException;
 import com.study.philstargram.post.domain.Post;
+import com.study.philstargram.post.domain.PostId;
 import com.study.philstargram.post.domain.PostRepository;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -27,7 +28,7 @@ class GetPostUseCaseTest {
     @Test
     void returnsPostWhenFound() {
         Post post = Post.reconstitute(1L, 2L, "hello", LocalDateTime.now());
-        when(postRepository.findById(1L)).thenReturn(Optional.of(post));
+        when(postRepository.findById(PostId.of(1L))).thenReturn(Optional.of(post));
 
         PostResult result = getPostUseCase.execute(1L);
 
@@ -37,7 +38,7 @@ class GetPostUseCaseTest {
 
     @Test
     void throwsWhenPostNotFound() {
-        when(postRepository.findById(1L)).thenReturn(Optional.empty());
+        when(postRepository.findById(PostId.of(1L))).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> getPostUseCase.execute(1L)).isInstanceOf(NotFoundException.class);
     }

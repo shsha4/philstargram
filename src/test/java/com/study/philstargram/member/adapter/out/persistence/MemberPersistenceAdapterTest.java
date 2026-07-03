@@ -34,7 +34,7 @@ class MemberPersistenceAdapterTest {
         var found = memberRepository.findById(saved.getId());
 
         assertThat(found).isPresent();
-        assertThat(found.get().getEmail()).isEqualTo("phill@example.com");
+        assertThat(found.get().getEmail().value()).isEqualTo("phill@example.com");
     }
 
     @Test

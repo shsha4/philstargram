@@ -149,15 +149,18 @@ Testcontainers PostgreSQL 을 띄웁니다.
 **계획된 단계 (인프라 + 도메인 인터리빙)**
 
 3. **신뢰성 + 도메인 리치화** — Outbox 로 이벤트 발행을 안정화하면서, 동시에 도메인
-   모델을 강화한다.
+   모델을 강화한다. ✅ 완료
    - Outbox: Spring Modulith 이벤트 발행 레지스트리(JDBC 기반)로 발행 신뢰성 +
      중복 처리 보완.
-   - 도메인 이벤트 전환: 이벤트를 UseCase(서비스)가 발행하는 대신 **애그리거트가
-     raise** 하고 커밋 시점에 발행하도록 변경.
-   - 값 객체(VO) 도입: `Email`, `Nickname` 등 — 도메인이 형식/불변식을 스스로 보장
-     (현재는 web DTO 의 `@Email` 에 위임 중).
-   - 타입드 ID: `MemberId`/`PostId`/`FollowId` — raw `Long` 오용을 컴파일 타임에 차단
-     (초기 설계 문서의 "식별자 타입" 의도 복원).
+   - 도메인 이벤트 전환: 이벤트를 UseCase(서비스)가 직접 만들지 않고 **애그리거트가
+     내부에 누적**(`PostWritten`/`MemberFollowed`)하고, UseCase 가 `pullDomainEvents()`
+     로 드레인해 모듈 간 계약 이벤트로 번역·발행. DB 생성 식별자는 저장 후 `assignId()`
+     로 애그리거트에 되돌려 부여(framework-free 유지, `AbstractAggregateRoot` 미사용).
+   - 값 객체(VO) 도입: `Email`/`Nickname` — 도메인이 형식/불변식을 스스로 보장하고
+     web DTO 의 `@Email`/`@Size` 는 제거(Result/영속성은 `.value()` 로 String 유지).
+   - 타입드 ID: `MemberId`/`PostId`/`FollowId` — 각 모듈 **내부 식별자와 리포지토리
+     포트만** 타입드로 하여 raw `Long` 오용을 컴파일 타임에 차단. 모듈 경계·이벤트는
+     결합 회피를 위해 raw `Long` 유지.
    - 인입 어댑터 일관성: 이벤트 리스너를 `adapter.in.event` 로 분리하고 실제 작업은
      `FanOutFeedUseCase` 등 UseCase 로 옮겨, web 어댑터와 동일한 헥사고날 구조로 정리.
    - 중복 규칙 제거: 게시글 길이 제한 등은 도메인 한 곳에서만 정의.

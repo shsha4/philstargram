@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.study.philstargram.common.exception.NotFoundException;
 import com.study.philstargram.member.domain.Member;
+import com.study.philstargram.member.domain.MemberId;
 import com.study.philstargram.member.domain.MemberRepository;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -27,7 +28,7 @@ class GetMemberUseCaseTest {
     @Test
     void returnsMemberWhenFound() {
         Member member = Member.reconstitute(1L, "phill@example.com", "phill", "hello", LocalDateTime.now());
-        when(memberRepository.findById(1L)).thenReturn(Optional.of(member));
+        when(memberRepository.findById(MemberId.of(1L))).thenReturn(Optional.of(member));
 
         MemberResult result = getMemberUseCase.execute(1L);
 
@@ -37,7 +38,7 @@ class GetMemberUseCaseTest {
 
     @Test
     void throwsWhenMemberNotFound() {
-        when(memberRepository.findById(1L)).thenReturn(Optional.empty());
+        when(memberRepository.findById(MemberId.of(1L))).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> getMemberUseCase.execute(1L)).isInstanceOf(NotFoundException.class);
     }
