@@ -17,16 +17,23 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p><b>phase 4 결합 제거:</b> 작성자 닉네임을 이벤트가 실어오므로(event-carried state) 더 이상
  * member 를 동기 조회하지 않는다. feed 는 이제 member 에 의존하지 않고 follow 만 호출한다.
+ *
+ * <p><b>캐시(phase 5a):</b> 팔로워별로 Postgres 에 먼저 저장(진실의 원천)한 뒤, 그 팔로워의 캐시가
+ * 이미 있을 때만 한 건을 덧붙인다(write-through-if-present). 콜드 캐시는 채우지 않는다.
  */
 @Service
 public class FanOutFeedUseCase {
 
+    private static final int FEED_CACHE_SIZE = 20;
+
     private final FollowQueryService followQueryService;
     private final FeedRepository feedRepository;
+    private final FeedCache feedCache;
 
-    public FanOutFeedUseCase(FollowQueryService followQueryService, FeedRepository feedRepository) {
+    public FanOutFeedUseCase(FollowQueryService followQueryService, FeedRepository feedRepository, FeedCache feedCache) {
         this.followQueryService = followQueryService;
         this.feedRepository = feedRepository;
+        this.feedCache = feedCache;
     }
 
     @Transactional
@@ -34,6 +41,8 @@ public class FanOutFeedUseCase {
         for (Long followerId : followQueryService.getFollowerIds(command.authorId())) {
             feedRepository.save(FeedEntry.create(
                     followerId, command.postId(), command.authorId(), command.authorNickname(), command.contentPreview(), command.createdAt()));
+            feedCache.appendIfPresent(followerId, new FeedItem(
+                    command.postId(), command.authorId(), command.authorNickname(), command.contentPreview(), command.createdAt()), FEED_CACHE_SIZE);
         }
     }
 }

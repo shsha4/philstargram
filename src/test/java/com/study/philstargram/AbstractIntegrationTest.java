@@ -2,6 +2,7 @@ package com.study.philstargram;
 
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.kafka.ConfluentKafkaContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
@@ -31,8 +32,14 @@ abstract class AbstractIntegrationTest {
     @ServiceConnection
     static final ConfluentKafkaContainer KAFKA = new ConfluentKafkaContainer("confluentinc/cp-kafka:7.8.0");
 
+    // 피드 읽기 캐시(phase 5a). GenericContainer 라 @ServiceConnection 에 name="redis" 힌트를 줘야
+    // Boot 의 Redis ConnectionDetailsFactory 가 매칭해 spring.data.redis.* 프로퍼티를 자동 주입한다.
+    @ServiceConnection(name = "redis")
+    static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+
     static {
         POSTGRES.start();
         KAFKA.start();
+        REDIS.start();
     }
 }

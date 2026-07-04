@@ -32,6 +32,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    // 피드 읽기 캐시(phase 5a). Lettuce 기반. 진실의 원천은 Postgres, Redis 는 버려도 되는 캐시.
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.modulith:spring-modulith-starter-jdbc'
     implementation 'org.springframework.modulith:spring-modulith-events-api'
@@ -49,6 +51,8 @@ dependencies {
     testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
     testImplementation 'org.testcontainers:testcontainers-postgresql'
     testImplementation 'org.testcontainers:testcontainers-kafka'
+    // Redis 캐시 통합 테스트용 컨테이너(범용 GenericContainer 사용). (phase 5a)
+    testImplementation 'org.testcontainers:testcontainers'
     testImplementation 'org.springframework.kafka:spring-kafka-test'
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.4.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
