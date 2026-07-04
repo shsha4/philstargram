@@ -18,7 +18,8 @@ import org.springframework.stereotype.Component;
  * notification 전용 컨슈머 그룹({@code notification})을 써 feed 컨슈머와 독립적으로 같은
  * {@code post.created} 이벤트를 각자 수신한다.
  *
- * <p><b>전달 보장:</b> at-least-once — 컨슈머 idempotency 는 phase 5 에서 다룬다.
+ * <p><b>전달 보장:</b> at-least-once. 재전달 시 중복 생성은 각 유즈케이스가 만든 {@code dedupKey}
+ * (notifications 유니크키) + ON CONFLICT DO NOTHING 으로 흡수한다(phase 5b, 자연 멱등성 방식).
  */
 @Component
 class NotificationEventListener {
@@ -33,7 +34,7 @@ class NotificationEventListener {
 
     @KafkaListener(topics = "post.created", groupId = "notification")
     void onPostCreated(PostCreatedEvent event) {
-        notifyNewPostUseCase.execute(new NotifyNewPostCommand(event.authorId(), event.authorNickname(), event.createdAt()));
+        notifyNewPostUseCase.execute(new NotifyNewPostCommand(event.postId(), event.authorId(), event.authorNickname(), event.createdAt()));
     }
 
     @KafkaListener(topics = "member.followed", groupId = "notification")

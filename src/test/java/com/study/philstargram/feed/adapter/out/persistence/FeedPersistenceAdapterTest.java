@@ -40,4 +40,14 @@ class FeedPersistenceAdapterTest {
 
         assertThat(feed).extracting(FeedEntry::getContentPreview).containsExactly("second", "first");
     }
+
+    @Test
+    void 같은_owner_post_는_중복_저장돼도_한_건만_남는다() {
+        LocalDateTime now = LocalDateTime.now();
+        // at-least-once 재전달 시 같은 (owner, post) 팬아웃이 두 번 와도 멱등(phase 5b).
+        feedRepository.save(FeedEntry.create(5L, 100L, 2L, "alice", "hello", now));
+        feedRepository.save(FeedEntry.create(5L, 100L, 2L, "alice", "hello", now));
+
+        assertThat(feedRepository.findRecentByOwnerMemberId(5L, 20)).hasSize(1);
+    }
 }

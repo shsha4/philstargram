@@ -16,8 +16,10 @@ class NotificationPersistenceAdapter implements NotificationRepository {
     }
 
     @Override
-    public Notification save(Notification notification) {
-        return toDomain(notificationJpaRepository.save(toEntity(notification)));
+    public void save(Notification notification) {
+        // 멱등 삽입: 같은 dedupKey 는 무시된다(phase 5b).
+        notificationJpaRepository.insertIgnoringDuplicate(notification.getRecipientMemberId(), notification.getType().name(),
+                notification.getMessage(), notification.getCreatedAt(), notification.getDedupKey());
     }
 
     @Override
@@ -27,11 +29,7 @@ class NotificationPersistenceAdapter implements NotificationRepository {
                 .toList();
     }
 
-    private static NotificationJpaEntity toEntity(Notification notification) {
-        return new NotificationJpaEntity(notification.getId(), notification.getRecipientMemberId(), notification.getType(), notification.getMessage(), notification.getCreatedAt());
-    }
-
     private static Notification toDomain(NotificationJpaEntity entity) {
-        return Notification.reconstitute(entity.getId(), entity.getRecipientMemberId(), entity.getType(), entity.getMessage(), entity.getCreatedAt());
+        return Notification.reconstitute(entity.getId(), entity.getRecipientMemberId(), entity.getType(), entity.getMessage(), entity.getCreatedAt(), entity.getDedupKey());
     }
 }

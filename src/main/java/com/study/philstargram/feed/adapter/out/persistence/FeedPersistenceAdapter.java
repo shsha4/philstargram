@@ -16,8 +16,10 @@ class FeedPersistenceAdapter implements FeedRepository {
     }
 
     @Override
-    public FeedEntry save(FeedEntry feedEntry) {
-        return toDomain(feedEntryJpaRepository.save(toEntity(feedEntry)));
+    public void save(FeedEntry feedEntry) {
+        // 멱등 삽입: 중복 팬아웃((owner, post) 충돌)은 무시된다(phase 5b).
+        feedEntryJpaRepository.insertIgnoringDuplicate(feedEntry.getOwnerMemberId(), feedEntry.getPostId(),
+                feedEntry.getAuthorId(), feedEntry.getAuthorNickname(), feedEntry.getContentPreview(), feedEntry.getCreatedAt());
     }
 
     @Override
@@ -25,11 +27,6 @@ class FeedPersistenceAdapter implements FeedRepository {
         return feedEntryJpaRepository.findByOwnerMemberIdOrderByCreatedAtDesc(ownerMemberId, PageRequest.of(0, limit)).stream()
                 .map(FeedPersistenceAdapter::toDomain)
                 .toList();
-    }
-
-    private static FeedEntryJpaEntity toEntity(FeedEntry feedEntry) {
-        return new FeedEntryJpaEntity(feedEntry.getId(), feedEntry.getOwnerMemberId(), feedEntry.getPostId(),
-                feedEntry.getAuthorId(), feedEntry.getAuthorNickname(), feedEntry.getContentPreview(), feedEntry.getCreatedAt());
     }
 
     private static FeedEntry toDomain(FeedEntryJpaEntity entity) {

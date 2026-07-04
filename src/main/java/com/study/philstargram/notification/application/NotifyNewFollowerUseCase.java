@@ -25,6 +25,8 @@ public class NotifyNewFollowerUseCase {
     @Transactional
     public void execute(NotifyNewFollowerCommand command) {
         String message = command.followerNickname() + "님이 회원님을 팔로우했습니다.";
-        notificationRepository.save(Notification.create(command.followeeId(), NotificationType.NEW_FOLLOWER, message, command.followedAt()));
+        // dedupKey = 수신자(followee) + 팔로워: 같은 팔로우 알림이 중복 생성되지 않게 한다(phase 5b).
+        String dedupKey = "NEW_FOLLOWER:" + command.followeeId() + ":" + command.followerId();
+        notificationRepository.save(Notification.create(command.followeeId(), NotificationType.NEW_FOLLOWER, message, command.followedAt(), dedupKey));
     }
 }

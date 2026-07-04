@@ -227,3 +227,29 @@ phase 별 작업 중 나눈 설계 토론에서 나온 **학습 노트**. 코드
 - 스택: Boot 가 자동설정한 `StringRedisTemplate` + Jackson 3(`tools.jackson`) `ObjectMapper`.
   테스트는 `GenericContainer("redis:7-alpine")` + `@ServiceConnection(name="redis")`(이미지명으로
   Boot 의 Redis ConnectionDetailsFactory 가 매칭 → `spring.data.redis.*` 자동 주입).
+
+---
+
+## 2026-07-04 — 컨슈머 idempotency 구현 (phase 5b) — 위 6번 결정의 실제 적용
+
+phase 4 후속 토론(위 6번)에서 정한 "자연 멱등성(A) vs 인박스(B)"를 실제로 붙였다.
+
+### 1. feed = 순수 자연 멱등성(A)
+- `feed_entries UNIQUE(owner_member_id, post_id)` + native `INSERT ... ON CONFLICT DO NOTHING`.
+- **JPA `save()` 를 쓰면 안 되는 이유**: 충돌 시 `save()` 는 예외를 던져 **트랜잭션을 abort** 시킨다.
+  팬아웃은 팔로워 루프라 한 건 충돌이 전체 트랜잭션을 깨면 안 됨 → `@Modifying` native 쿼리로 우회.
+  포트 `FeedRepository.save` 반환을 `void` 로 바꿔 "멱등 삽입"임을 시그니처로 드러냈다.
+
+### 2. notification = "파생 자연키"로 A 를 적용(예상했던 B 대신)
+- 위 6번은 notification 을 "자연 유니크키 없음 → 인박스(B)" 후보로 봤다. 실제로는 **별도 inbox(event_id)
+  테이블 없이**, 이벤트 내용으로 **결정적 dedup_key `type:recipient:sourceId`** 를 만들어 notifications
+  **자기 테이블**에 유니크키로 얹었다(`NEW_POST:{follower}:{postId}`, `NEW_FOLLOWER:{followee}:{follower}`).
+- 즉 인박스(추가 테이블·조인)를 피하고 **A 방식(비즈니스 테이블 자신의 유니크키)에 그대로 얹은** 것.
+  **전제**: 소스 이벤트가 알림을 결정적으로 식별할 수 있어야 함(우리는 가능) → 이게 성립하면 B 보다 쌈.
+  성립 안 하는 경우(예: eventId 만 있고 내용 매핑이 불가)에만 인박스(B)가 필요.
+- 이를 위해 `PostCreatedEvent`→`NotifyNewPostCommand` 에 **postId 를 전달**하도록 확장(기존엔 authorId 만
+  넘겨 게시글 식별이 불가했음).
+
+### 3. Kafka Streams 집계의 멱등성은 5c 에서 별도로(스포일러)
+- 컨슈머 쓰기 멱등성(위)과 별개로, follower-count 집계(5c)의 멱등성은 "관계 키 기준 upsert/tombstone
+  KTable" 로 모델링해 +1/-1 누적의 중복 문제를 구조적으로 없앤다. 같은 A(자연 멱등)의 스트림 버전.

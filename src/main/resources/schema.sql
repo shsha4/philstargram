@@ -39,7 +39,10 @@ CREATE TABLE IF NOT EXISTS feed_entries (
     author_id        BIGINT        NOT NULL,
     author_nickname  VARCHAR(50)   NOT NULL,
     content_preview  VARCHAR(200)  NOT NULL,
-    created_at       TIMESTAMP     NOT NULL
+    created_at       TIMESTAMP     NOT NULL,
+    -- 컨슈머 idempotency(phase 5b): at-least-once 재전달로 같은 게시글이 같은 사용자의 피드에
+    -- 두 번 팬아웃돼도 이 자연 유니크키 + ON CONFLICT DO NOTHING 으로 한 건만 남는다.
+    CONSTRAINT uq_feed_entries_owner_post UNIQUE (owner_member_id, post_id)
 );
 CREATE INDEX IF NOT EXISTS idx_feed_entries_owner_created_at ON feed_entries (owner_member_id, created_at DESC);
 
@@ -50,6 +53,10 @@ CREATE TABLE IF NOT EXISTS notifications (
     recipient_member_id  BIGINT       NOT NULL,
     type                 VARCHAR(20)  NOT NULL,
     message              VARCHAR(500) NOT NULL,
-    created_at           TIMESTAMP    NOT NULL
+    created_at           TIMESTAMP    NOT NULL,
+    -- 컨슈머 idempotency(phase 5b): notification 은 비즈니스 자연키가 없어 소스 이벤트로부터 만든
+    -- dedup_key(type:recipient:sourceId)를 유니크키로 둔다. 재전달 시 ON CONFLICT DO NOTHING 으로 흡수.
+    dedup_key            VARCHAR(100) NOT NULL,
+    CONSTRAINT uq_notifications_dedup_key UNIQUE (dedup_key)
 );
 CREATE INDEX IF NOT EXISTS idx_notifications_recipient_created_at ON notifications (recipient_member_id, created_at DESC);

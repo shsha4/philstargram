@@ -32,15 +32,19 @@ public class NotificationJpaEntity {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "dedup_key", nullable = false, length = 100)
+    private String dedupKey;
+
     protected NotificationJpaEntity() {
     }
 
-    public NotificationJpaEntity(Long id, Long recipientMemberId, NotificationType type, String message, LocalDateTime createdAt) {
+    public NotificationJpaEntity(Long id, Long recipientMemberId, NotificationType type, String message, LocalDateTime createdAt, String dedupKey) {
         this.id = id;
         this.recipientMemberId = recipientMemberId;
         this.type = type;
         this.message = message;
         this.createdAt = createdAt;
+        this.dedupKey = dedupKey;
     }
 
     public Long getId() {
@@ -61,5 +65,9 @@ public class NotificationJpaEntity {
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public String getDedupKey() {
+        return dedupKey;
     }
 }

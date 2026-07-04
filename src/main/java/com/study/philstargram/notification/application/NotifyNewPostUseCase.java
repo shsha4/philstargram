@@ -29,7 +29,9 @@ public class NotifyNewPostUseCase {
     public void execute(NotifyNewPostCommand command) {
         String message = command.authorNickname() + "님이 새 게시글을 작성했습니다.";
         for (Long followerId : followQueryService.getFollowerIds(command.authorId())) {
-            notificationRepository.save(Notification.create(followerId, NotificationType.NEW_POST, message, command.createdAt()));
+            // dedupKey = 수신자 + 게시글: 같은 게시글 알림이 같은 사람에게 두 번 만들어지지 않게 한다(phase 5b).
+            String dedupKey = "NEW_POST:" + followerId + ":" + command.postId();
+            notificationRepository.save(Notification.create(followerId, NotificationType.NEW_POST, message, command.createdAt(), dedupKey));
         }
     }
 }

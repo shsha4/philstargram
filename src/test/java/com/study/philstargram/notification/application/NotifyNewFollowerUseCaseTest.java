@@ -26,6 +26,7 @@ class NotifyNewFollowerUseCaseTest {
         notifyNewFollowerUseCase.execute(new NotifyNewFollowerCommand(2L, 1L, "bob", LocalDateTime.now()));
 
         verify(notificationRepository).save(argThat(n ->
-                n.getRecipientMemberId().equals(1L) && n.getMessage().contains("bob")));
+                n.getRecipientMemberId().equals(1L) && n.getMessage().contains("bob")
+                        && n.getDedupKey().equals("NEW_FOLLOWER:1:2")));
     }
 }

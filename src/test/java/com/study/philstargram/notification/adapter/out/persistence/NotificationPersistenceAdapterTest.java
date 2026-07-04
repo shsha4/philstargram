@@ -33,12 +33,22 @@ class NotificationPersistenceAdapterTest {
     @Test
     void findsRecentNotificationsForRecipientInDescendingOrder() {
         LocalDateTime now = LocalDateTime.now();
-        notificationRepository.save(Notification.create(1L, NotificationType.NEW_FOLLOWER, "bob followed you", now.minusMinutes(1)));
-        notificationRepository.save(Notification.create(1L, NotificationType.NEW_POST, "alice posted", now));
-        notificationRepository.save(Notification.create(9L, NotificationType.NEW_POST, "not mine", now));
+        notificationRepository.save(Notification.create(1L, NotificationType.NEW_FOLLOWER, "bob followed you", now.minusMinutes(1), "NEW_FOLLOWER:1:2"));
+        notificationRepository.save(Notification.create(1L, NotificationType.NEW_POST, "alice posted", now, "NEW_POST:1:10"));
+        notificationRepository.save(Notification.create(9L, NotificationType.NEW_POST, "not mine", now, "NEW_POST:9:10"));
 
         List<Notification> notifications = notificationRepository.findRecentByRecipientMemberId(1L, 20);
 
         assertThat(notifications).extracting(Notification::getMessage).containsExactly("alice posted", "bob followed you");
+    }
+
+    @Test
+    void 같은_dedupKey_는_중복_저장돼도_한_건만_남는다() {
+        LocalDateTime now = LocalDateTime.now();
+        // at-least-once 재전달 시 같은 알림이 두 번 와도 멱등(phase 5b).
+        notificationRepository.save(Notification.create(7L, NotificationType.NEW_POST, "alice posted", now, "NEW_POST:7:55"));
+        notificationRepository.save(Notification.create(7L, NotificationType.NEW_POST, "alice posted", now, "NEW_POST:7:55"));
+
+        assertThat(notificationRepository.findRecentByRecipientMemberId(7L, 20)).hasSize(1);
     }
 }
