@@ -7,8 +7,8 @@
 ## 기술 스택
 
 Java 21, Spring Boot 4.1, Spring Modulith(+ 이벤트 외부화), Spring Data JPA, PostgreSQL,
-Kafka(Spring Kafka), Testcontainers, ArchUnit. Redis / Elasticsearch 는 아래 로드맵에
-따라 한꺼번에가 아니라 단계적으로 도입합니다.
+Kafka(Spring Kafka + Kafka Streams), Redis(Spring Data Redis, 피드 캐시), Testcontainers,
+ArchUnit. Elasticsearch 는 아래 로드맵(phase 6)에 따라 이후 단계적으로 도입합니다.
 
 ## 모듈 구성과 분리 이유
 
@@ -53,9 +53,12 @@ com.study.philstargram
    `FollowMemberUseCase` 등)를 호출합니다.
 5. **모듈 간 순환 의존 금지.** `ArchitectureTest`(`modulesAreFreeOfCycles`)가
    강제합니다. 현재 의존 그래프는 다음과 같습니다:
-   `post`, `follow` → `member`; `feed`, `notification` → `follow`.
+   `post`, `follow` → `member`; `notification` → `follow`;
+   `feed` → `follow`, `post`.
    (phase 4 의 event-carried state 로 `feed`/`notification` 의 `member` 의존이 사라졌습니다 —
-   필요한 작성자/팔로워 닉네임을 이벤트가 실어오기 때문입니다.)
+   필요한 작성자/팔로워 닉네임을 이벤트가 실어오기 때문입니다. phase 5c 하이브리드 팬아웃에서
+   `feed` → `post` 가 추가됐습니다: 셀럽 글을 읽기 시점에 pull 하는데, `post` 가 작성자 닉네임을
+   스냅샷으로 들고 있어 `feed` → `member` 결합은 여전히 없습니다.)
 
 모듈별 헥사고날 흐름: `adapter.in.web → application → domain`,
 `adapter.out.persistence → application/domain`, 그리고 `domain` 은 바깥을 향하지
@@ -78,9 +81,28 @@ com.study.philstargram
 않습니다.
 
 컨슈머는 발행 트랜잭션과 무관한 별도 프로세스/트랜잭션에서 실행되므로, 팬아웃이 느리거나
-실패해도 게시글 생성 자체를 막거나 롤백시키지 않습니다(at-least-once). 팔로워가 매우 많은
-계정에서 팬아웃 비용이 커지는 문제는 추후 하이브리드/읽기 시점 팬아웃 전략(로드맵
-phase 5)으로 보완할 수 있도록 설계했습니다.
+실패해도 게시글 생성 자체를 막거나 롤백시키지 않습니다(at-least-once). at-least-once 재전달로
+같은 팬아웃/알림이 중복될 수 있는 문제는 phase 5b 에서 **자연 멱등성**(비즈니스 테이블의 유니크키
++ `ON CONFLICT DO NOTHING`)으로 흡수합니다: feed 는 `UNIQUE(owner_member_id, post_id)`,
+notification 은 이벤트에서 파생한 `dedup_key` 를 씁니다.
+
+### 하이브리드 팬아웃 (phase 5c)
+
+팔로워가 매우 많은 계정(셀럽)이 글을 쓰면 쓰기 시점 팬아웃 비용이 폭발합니다. 그래서 **작성자가
+셀럽이면 쓰기 팬아웃을 건너뛰고**, 팔로워가 피드를 조회할 때 그 셀럽의 최근 글을 **읽기 시점에
+pull** 해 materialized 피드와 병합합니다(`GetMyFeedUseCase`). 일반 작성자는 기존대로 쓰기 시점
+팬아웃합니다.
+
+셀럽 판별은 **follower-count** 로 합니다. `follow` 모듈이 `member.followed`/`member.unfollowed`
+이벤트를 **Kafka Streams** 로 집계해 followee 별 팔로워 수를 KTable(상태 저장소)로 유지하고,
+임계값 이상이면 셀럽으로 봅니다(`FollowQueryService.isCeleb`, interactive query). 이 집계는
+관계 키 기준 upsert/tombstone 으로 모델링해 이벤트가 재전달돼도 카운트가 어긋나지 않습니다.
+
+### 피드 캐시 (phase 5a)
+
+피드 조회는 Redis(ZSET)로 캐시합니다. **진실의 원천은 Postgres**, Redis 는 버려도 되는 사본입니다.
+읽기는 cache-aside(미스 시 Postgres 재적재), 쓰기(팬아웃)는 캐시가 있을 때만 덧붙이는
+write-through, 실패 시 무효화(fail-safe)로 동작합니다 — 자세한 일관성 설계는 `LEARNINGS.md` 참고.
 
 ## 왜 이벤트인가
 
@@ -101,12 +123,12 @@ phase 5)으로 보완할 수 있도록 설계했습니다.
 ## 로컬 실행
 
 ```bash
-# 전체 스택(운영 형태): postgres + kafka + backend + frontend
-docker compose up -d --build   # frontend :3000, backend :8080, db :5432, kafka :9092
+# 전체 스택(운영 형태): postgres + kafka + redis + backend + frontend
+docker compose up -d --build   # frontend :3000, backend :8080, db :5432, kafka :9092, redis :6379
 
 # 개발(핫리로드): 인프라만 컨테이너로, 앱은 로컬 실행
-docker compose up -d postgres kafka  # PostgreSQL + Kafka(KRaft 단일 브로커)
-./gradlew bootRun                    # 앱 기동; 시작 시 schema.sql 실행
+docker compose up -d postgres kafka redis  # PostgreSQL + Kafka(KRaft 단일 브로커) + Redis
+./gradlew bootRun                          # 앱 기동; 시작 시 schema.sql 실행
 ```
 
 테스트는 `docker compose up` 이 필요 없습니다. 통합 테스트는 각자 Testcontainers 로
@@ -180,11 +202,17 @@ PostgreSQL 과 Kafka 를 띄웁니다(Docker 데몬은 실행 중이어야 함).
    - Kafka Streams 는 미도입: "이벤트→DB 사이드이펙트"엔 일반 컨슈머가 맞다. 집계/조인 명분이 생기는
      phase 5 하이브리드 팬아웃에서 검토.
 
+5. **Redis + 일관성 전략** — 피드 캐시 + 하이브리드 팬아웃. ✅ 완료
+   - 5a Redis 피드 캐시: 진실의 원천=Postgres, Redis=버려도 되는 사본. cache-aside 읽기 +
+     write-through-if-present 쓰기 + fail-safe 무효화(bounded staleness). 이중 쓰기 일관성 전략을
+     먼저 설계한 뒤 도입(`LEARNINGS.md`).
+   - 5b 컨슈머 idempotency: at-least-once 중복을 자연 멱등성(비즈니스 유니크키 + `ON CONFLICT
+     DO NOTHING`)으로 흡수. notification 은 이벤트에서 파생한 `dedup_key` 사용.
+   - 5c 하이브리드 팬아웃: 셀럽은 쓰기 팬아웃 스킵 + 읽기 시점 pull 병합. 셀럽 판별용 follower-count 를
+     **Kafka Streams(KTable, 관계 키 upsert/tombstone → 멱등)** 로 집계, interactive query 로 조회.
+
 **계획된 단계 (인프라 + 도메인 인터리빙)**
 
-5. **Redis + 일관성 전략** — 피드 캐시 도입. 단, **이중 쓰기(dual-write) 일관성 전략
-   (write-through / 캐시 무효화)을 먼저 설계**한 뒤 진행. 팔로워가 많은 계정용
-   하이브리드/읽기 시점 팬아웃 전략 실험.
 6. **Elasticsearch + CQRS 명시화** — `PostCreatedEvent` 기반 검색 색인. search 를 별도
    읽기 모델(CQRS)로 명확히 하고, 원본/색인 동기화 지연·유실 대비.
 7. **분리 가능성 증명** — 확립한 모듈 API / 이벤트 계약 / DB 소유권 경계를 근거로 `feed`

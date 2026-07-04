@@ -19,4 +19,10 @@ class FollowEventTopicConfig {
     NewTopic memberFollowedTopic() {
         return TopicBuilder.name("member.followed").partitions(1).replicas(1).build();
     }
+
+    /** 언팔로우 계약(phase 5c). follower-count 집계 Streams 가 구독한다. */
+    @Bean
+    NewTopic memberUnfollowedTopic() {
+        return TopicBuilder.name("member.unfollowed").partitions(1).replicas(1).build();
+    }
 }

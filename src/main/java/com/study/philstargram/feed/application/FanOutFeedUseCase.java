@@ -20,6 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p><b>캐시(phase 5a):</b> 팔로워별로 Postgres 에 먼저 저장(진실의 원천)한 뒤, 그 팔로워의 캐시가
  * 이미 있을 때만 한 건을 덧붙인다(write-through-if-present). 콜드 캐시는 채우지 않는다.
+ *
+ * <p><b>하이브리드 팬아웃(phase 5c):</b> 작성자가 셀럽(팔로워 수 임계값 이상)이면 쓰기 팬아웃을
+ * 건너뛴다 — 수백만 피드에 미리 밀어넣지 않고, 팔로워가 조회할 때 읽기 시점에 pull 한다
+ * ({@code GetMyFeedUseCase} 의 병합). 일반 작성자는 기존대로 쓰기 시점 팬아웃.
  */
 @Service
 public class FanOutFeedUseCase {
@@ -38,6 +42,9 @@ public class FanOutFeedUseCase {
 
     @Transactional
     public void execute(FanOutFeedCommand command) {
+        if (followQueryService.isCeleb(command.authorId())) {
+            return; // 셀럽은 쓰기 팬아웃 스킵 → 팔로워가 읽기 시점에 pull
+        }
         for (Long followerId : followQueryService.getFollowerIds(command.authorId())) {
             feedRepository.save(FeedEntry.create(
                     followerId, command.postId(), command.authorId(), command.authorNickname(), command.contentPreview(), command.createdAt()));

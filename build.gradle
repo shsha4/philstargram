@@ -41,6 +41,8 @@ dependencies {
     implementation 'org.springframework.kafka:spring-kafka'
     // 이벤트 발행 레지스트리(Outbox)를 Kafka 토픽으로 릴레이하는 externalizer 자동설정.
     implementation 'org.springframework.modulith:spring-modulith-events-kafka'
+    // 하이브리드 팬아웃(phase 5c): follower-count 집계(KTable)를 위한 Kafka Streams. 버전은 Boot 관리.
+    implementation 'org.apache.kafka:kafka-streams'
 
     runtimeOnly 'org.postgresql:postgresql'
 
@@ -54,6 +56,8 @@ dependencies {
     // Redis 캐시 통합 테스트용 컨테이너(범용 GenericContainer 사용). (phase 5a)
     testImplementation 'org.testcontainers:testcontainers'
     testImplementation 'org.springframework.kafka:spring-kafka-test'
+    // Kafka Streams 토폴로지 결정적 단위 테스트(브로커 불필요, phase 5c).
+    testImplementation 'org.apache.kafka:kafka-streams-test-utils'
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.4.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

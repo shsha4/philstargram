@@ -9,15 +9,16 @@ class PostTest {
 
     @Test
     void writesPostWithinLengthLimit() {
-        Post post = Post.write(1L, "hello");
+        Post post = Post.write(1L, "alice", "hello");
 
         assertThat(post.getAuthorId()).isEqualTo(1L);
+        assertThat(post.getAuthorNickname()).isEqualTo("alice");
         assertThat(post.getContent()).isEqualTo("hello");
     }
 
     @Test
     void rejectsBlankContent() {
-        assertThatThrownBy(() -> Post.write(1L, "   "))
+        assertThatThrownBy(() -> Post.write(1L, "alice", "   "))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -25,7 +26,7 @@ class PostTest {
     void rejectsContentOverMaxLength() {
         String tooLong = "a".repeat(Post.MAX_CONTENT_LENGTH + 1);
 
-        assertThatThrownBy(() -> Post.write(1L, tooLong))
+        assertThatThrownBy(() -> Post.write(1L, "alice", tooLong))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -33,12 +34,12 @@ class PostTest {
     void allowsContentExactlyAtMaxLength() {
         String atLimit = "a".repeat(Post.MAX_CONTENT_LENGTH);
 
-        assertThat(Post.write(1L, atLimit).getContent()).hasSize(Post.MAX_CONTENT_LENGTH);
+        assertThat(Post.write(1L, "alice", atLimit).getContent()).hasSize(Post.MAX_CONTENT_LENGTH);
     }
 
     @Test
     void raisesPostWrittenEventAfterIdIsAssigned() {
-        Post post = Post.write(1L, "hello");
+        Post post = Post.write(1L, "alice", "hello");
         post.assignId(PostId.of(10L));
 
         assertThat(post.pullDomainEvents())
@@ -52,7 +53,7 @@ class PostTest {
 
     @Test
     void drainsDomainEventsOnlyOnce() {
-        Post post = Post.write(1L, "hello");
+        Post post = Post.write(1L, "alice", "hello");
         post.assignId(PostId.of(10L));
 
         assertThat(post.pullDomainEvents()).hasSize(1);
@@ -61,14 +62,14 @@ class PostTest {
 
     @Test
     void reconstitutedPostRaisesNoEvents() {
-        Post post = Post.reconstitute(10L, 1L, "hello", java.time.LocalDateTime.now());
+        Post post = Post.reconstitute(10L, 1L, "alice", "hello", java.time.LocalDateTime.now());
 
         assertThat(post.pullDomainEvents()).isEmpty();
     }
 
     @Test
     void rejectsAssigningIdTwice() {
-        Post post = Post.write(1L, "hello");
+        Post post = Post.write(1L, "alice", "hello");
         post.assignId(PostId.of(10L));
 
         assertThatThrownBy(() -> post.assignId(PostId.of(11L)))

@@ -27,7 +27,7 @@ class GetPostUseCaseTest {
 
     @Test
     void returnsPostWhenFound() {
-        Post post = Post.reconstitute(1L, 2L, "hello", LocalDateTime.now());
+        Post post = Post.reconstitute(1L, 2L, "author", "hello", LocalDateTime.now());
         when(postRepository.findById(PostId.of(1L))).thenReturn(Optional.of(post));
 
         PostResult result = getPostUseCase.execute(1L);

@@ -43,6 +43,13 @@ class FollowPersistenceAdapter implements FollowRepository {
                 .toList();
     }
 
+    @Override
+    public List<Long> findFolloweeIdsByFollowerId(Long followerId) {
+        return followJpaRepository.findByFollowerId(followerId).stream()
+                .map(FollowJpaEntity::getFolloweeId)
+                .toList();
+    }
+
     private static FollowJpaEntity toEntity(Follow follow) {
         Long id = follow.getId() == null ? null : follow.getId().value();
         return new FollowJpaEntity(id, follow.getFollowerId(), follow.getFolloweeId(), follow.getFollowedAt());

@@ -11,19 +11,23 @@ public class Post {
 
     private PostId id;                 // 저장 시 DB 가 생성한 식별자를 부여받으므로 final 이 아니다
     private final Long authorId;       // member 모듈 식별자 → 모듈 결합을 피하려 raw Long 유지
+    private final String authorNickname; // 작성 시점 닉네임 스냅샷(비정규화). 읽기 시점 pull(하이브리드
+                                       // 팬아웃, phase 5c)에서 feed 가 member 를 재조회하지 않게 한다.
     private final String content;
     private final LocalDateTime createdAt;
     private boolean written;           // write() 로 갓 생성된 신규 게시글인지(도메인 이벤트 발생 대상)
 
-    private Post(PostId id, Long authorId, String content, LocalDateTime createdAt) {
+    private Post(PostId id, Long authorId, String authorNickname, String content, LocalDateTime createdAt) {
         this.id = id;
         this.authorId = authorId;
+        this.authorNickname = authorNickname;
         this.content = content;
         this.createdAt = createdAt;
     }
 
-    public static Post write(Long authorId, String content) {
+    public static Post write(Long authorId, String authorNickname, String content) {
         Objects.requireNonNull(authorId, "authorId must not be null");
+        Objects.requireNonNull(authorNickname, "authorNickname must not be null");
         Objects.requireNonNull(content, "content must not be null");
         if (content.isBlank()) {
             throw new IllegalArgumentException("게시글 내용은 비어있을 수 없습니다.");
@@ -31,13 +35,13 @@ public class Post {
         if (content.length() > MAX_CONTENT_LENGTH) {
             throw new IllegalArgumentException("게시글 내용은 " + MAX_CONTENT_LENGTH + "자를 초과할 수 없습니다.");
         }
-        Post post = new Post(null, authorId, content, LocalDateTime.now());
+        Post post = new Post(null, authorId, authorNickname, content, LocalDateTime.now());
         post.written = true;
         return post;
     }
 
-    public static Post reconstitute(Long id, Long authorId, String content, LocalDateTime createdAt) {
-        return new Post(PostId.of(id), authorId, content, createdAt);
+    public static Post reconstitute(Long id, Long authorId, String authorNickname, String content, LocalDateTime createdAt) {
+        return new Post(PostId.of(id), authorId, authorNickname, content, createdAt);
     }
 
     /**
@@ -69,6 +73,10 @@ public class Post {
 
     public Long getAuthorId() {
         return authorId;
+    }
+
+    public String getAuthorNickname() {
+        return authorNickname;
     }
 
     public String getContent() {

@@ -19,6 +19,9 @@ public class PostJpaEntity {
     @Column(name = "author_id", nullable = false)
     private Long authorId;
 
+    @Column(name = "author_nickname", nullable = false, length = 50)
+    private String authorNickname;
+
     @Column(nullable = false, length = 2000)
     private String content;
 
@@ -28,9 +31,10 @@ public class PostJpaEntity {
     protected PostJpaEntity() {
     }
 
-    public PostJpaEntity(Long id, Long authorId, String content, LocalDateTime createdAt) {
+    public PostJpaEntity(Long id, Long authorId, String authorNickname, String content, LocalDateTime createdAt) {
         this.id = id;
         this.authorId = authorId;
+        this.authorNickname = authorNickname;
         this.content = content;
         this.createdAt = createdAt;
     }
@@ -41,6 +45,10 @@ public class PostJpaEntity {
 
     public Long getAuthorId() {
         return authorId;
+    }
+
+    public String getAuthorNickname() {
+        return authorNickname;
     }
 
     public String getContent() {

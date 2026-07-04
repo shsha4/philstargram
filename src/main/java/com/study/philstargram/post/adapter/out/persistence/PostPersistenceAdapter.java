@@ -3,7 +3,9 @@ package com.study.philstargram.post.adapter.out.persistence;
 import com.study.philstargram.post.domain.Post;
 import com.study.philstargram.post.domain.PostId;
 import com.study.philstargram.post.domain.PostRepository;
+import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -31,12 +33,22 @@ class PostPersistenceAdapter implements PostRepository {
         return postJpaRepository.findById(id.value()).map(PostPersistenceAdapter::toDomain);
     }
 
+    @Override
+    public List<Post> findRecentByAuthorIds(List<Long> authorIds, int limit) {
+        if (authorIds.isEmpty()) {
+            return List.of();
+        }
+        return postJpaRepository.findByAuthorIdInOrderByCreatedAtDesc(authorIds, PageRequest.of(0, limit)).stream()
+                .map(PostPersistenceAdapter::toDomain)
+                .toList();
+    }
+
     private static PostJpaEntity toEntity(Post post) {
         Long id = post.getId() == null ? null : post.getId().value();
-        return new PostJpaEntity(id, post.getAuthorId(), post.getContent(), post.getCreatedAt());
+        return new PostJpaEntity(id, post.getAuthorId(), post.getAuthorNickname(), post.getContent(), post.getCreatedAt());
     }
 
     private static Post toDomain(PostJpaEntity entity) {
-        return Post.reconstitute(entity.getId(), entity.getAuthorId(), entity.getContent(), entity.getCreatedAt());
+        return Post.reconstitute(entity.getId(), entity.getAuthorId(), entity.getAuthorNickname(), entity.getContent(), entity.getCreatedAt());
     }
 }

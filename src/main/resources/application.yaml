@@ -33,6 +33,13 @@ spring:
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       # 컨슈머가 토픽보다 먼저 떠도 처음부터 읽도록(개발/테스트 결정성).
       auto-offset-reset: earliest
+    streams:
+      # 하이브리드 팬아웃(phase 5c) follower-count 집계 Streams 앱. application-id = 컨슈머 그룹이자
+      # 상태 저장소 네임스페이스. 값 SerDe 는 토폴로지에서 토픽별로 지정(JSON 문자열 → 파싱).
+      application-id: philstargram-follower-count
+      properties:
+        # 재시작·리밸런스 시 처음부터 읽어 카운트를 정확히 복원(단일 브로커 개발/테스트 결정성).
+        auto.offset.reset: earliest
   modulith:
     events:
       jdbc:
@@ -49,3 +56,7 @@ philstargram:
     cache:
       # 피드 캐시 TTL(phase 5a). 진실의 원천은 Postgres 이므로 캐시는 만료돼도 다음 읽기에 재적재된다.
       ttl: PT10M
+  follow:
+    # 셀럽 판별 임계값(phase 5c). 팔로워 수가 이 값 이상이면 쓰기 팬아웃을 건너뛰고 읽기 시점 pull 로
+    # 전환한다. 운영값은 크게(수만~). 테스트는 프로퍼티로 낮춰 오버라이드한다.
+    celeb-threshold: 1000

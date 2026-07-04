@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -50,6 +51,18 @@ class FanOutFeedUseCaseTest {
                         && entry.getAuthorNickname().equals("alice")
                         && entry.getContentPreview().equals("hello")));
         verify(feedRepository).save(argThat(entry -> entry.getOwnerMemberId().equals(3L)));
+    }
+
+    @Test
+    void 셀럽_작성자면_쓰기_팬아웃을_건너뛴다() {
+        // 셀럽은 읽기 시점 pull 로 처리 — 쓰기 팬아웃(피드 저장/캐시 append)을 하지 않는다(phase 5c).
+        when(followQueryService.isCeleb(1L)).thenReturn(true);
+
+        fanOutFeedUseCase.execute(new FanOutFeedCommand(10L, 1L, "celeb", "hello", LocalDateTime.now()));
+
+        verify(followQueryService, never()).getFollowerIds(anyLong());
+        verify(feedRepository, never()).save(any(FeedEntry.class));
+        verify(feedCache, never()).appendIfPresent(anyLong(), any(FeedItem.class), anyInt());
     }
 
     @Test
